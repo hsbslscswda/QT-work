@@ -1,0 +1,3 @@
+* text=auto eol=lf
+# Preserve audited bytes on every platform, including Windows checkouts.
+backend/a22/** -text
