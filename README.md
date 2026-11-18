@@ -6,11 +6,11 @@
 
 ## 下载与运行
 
-首次上传 GitHub 并完成自动构建后，可以使用以下入口。当前源码交付阶段尚未生成 Windows 安装包。
+Windows 免安装包由 GitHub Actions 自动构建并发布。可通过以下入口下载；若尚无发布文件，可在仓库的 Actions 页面查看构建进度。
 
 [下载 Windows 64 位免安装版](https://github.com/hsbslscswda/QT-work/releases/latest/download/Xinqing-Windows-x64.zip) · [查看发布记录](https://github.com/hsbslscswda/QT-work/releases)
 
-下载后先解压整个文件夹，再双击 `Xinqing.exe`。发布包会包含 Qt 运行依赖，无需安装 Qt Creator。首次使用时，打开侧边栏底部的“服务连接配置”，填写地址、模型名和自己的 API Key，保存后发送一条消息。
+下载后先解压整个文件夹，再双击 `Xinqing.exe`。发布包包含 Qt 运行依赖，无需安装 Qt Creator。若系统提示缺少 `MSVCP140.dll` 或 `VCRUNTIME140.dll`，先运行包内的 `vc_redist.x64.exe` 安装微软 C++ 运行库，再启动心晴。首次使用时，打开侧边栏底部的“服务连接配置”，填写地址、模型名和自己的 API Key，保存后发送一条消息。
 
 **使用 API 不需要下载权重，也不需要本机有独立显卡。API 服务及其调用费用由使用者自行准备。** 仅打开和浏览界面不需要 API。
 
