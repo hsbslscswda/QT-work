@@ -1,0 +1,88 @@
+name: Build and publish desktop app
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          cache: true
+      - name: Compile
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel 2
+      - name: Test Qt client
+        run: ctest --test-dir build --output-on-failure
+      - name: Package with Qt dependencies
+        shell: pwsh
+        run: ./scripts/package-windows.ps1 -BuildDir build -QtDir $env:QT_ROOT_DIR
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-package
+          path: |
+            dist/Xinqing-Windows-x64.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt development dependencies
+        run: sudo apt-get update && sudo apt-get install -y qt6-base-dev qt6-base-dev-tools ninja-build
+      - name: Compile and test Qt client
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel 2
+          ctest --test-dir build --output-on-failure
+      - name: Test A22 boundary behavior
+        run: python3 backend/tools/test_a22_boundaries.py --project backend/a22 --output /tmp/a22-boundaries
+      - name: Test A22 HTTP integration and source checksums
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Validate Compose without starting a GPU
+        run: docker compose --env-file .env.example --profile tools config --quiet
+      - name: Build batch image and check CLI
+        run: |
+          docker build -f docker/Dockerfile.batch -t xinqing-batch:ci .
+          docker run --rm xinqing-batch:ci --help
+      - name: Build Linux Qt image and run bundled checks
+        run: docker build -f docker/Dockerfile.qt -t xinqing-qt:ci .
+  release:
+    needs: [windows, linux]
+    if: github.event_name == 'push' && github.repository == 'hsbslscswda/QT-work'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-package
+          path: dist
+      - name: Publish matching source commit and Windows package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          if [ "$REF_TYPE" = tag ]; then tag="$REF_NAME"; else tag="desktop-build-$BUILD_NUMBER"; fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'Release exists; refusing to replace an already published version.' >&2
+            exit 1
+          fi
+          printf '心晴 v5.1 Windows 64 位免安装版。解压全部文件后运行 Xinqing.exe。\n\n源码提交：%s\n\n模型权重和 API 密钥由使用者自行准备，安装包不包含模型。\n' "$SOURCE_SHA" > release-notes.txt
+          gh release create "$tag" dist/Xinqing-Windows-x64.zip dist/SHA256SUMS.txt --target "$SOURCE_SHA" --title "心晴 v5.1 · $tag" --notes-file release-notes.txt --latest

@@ -1,0 +1,58 @@
+services:
+  model:
+    image: vllm/vllm-openai:v0.19.0
+    ports:
+      - "127.0.0.1:${MODEL_PORT:-8000}:8000"
+    volumes:
+      - type: bind
+        source: ${MODEL_DIR:-./models/Qwen2.5-14B-Instruct}
+        target: /models/qwen
+        read_only: true
+        bind:
+          create_host_path: false
+    environment:
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      VLLM_API_KEY: ${MODEL_API_KEY:?Copy .env.example to .env and set MODEL_API_KEY}
+    command:
+      - --model
+      - /models/qwen
+      - --served-model-name
+      - ${MODEL_NAME:-Qwen2.5-14B-Instruct}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --tensor-parallel-size
+      - ${GPU_COUNT:-2}
+      - --max-model-len
+      - ${MODEL_MAX_LEN:-8192}
+    shm_size: 8gb
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${GPU_COUNT:-2}
+              capabilities: [gpu]
+    healthcheck:
+      test: [CMD, python3, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 20s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
+  batch:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.batch
+    environment:
+      EVALUATION_BACKEND: openai_compatible
+      EVALUATION_BASE_URL: ${EVALUATION_BASE_URL:-http://model:8000/v1}
+      EVALUATION_API_MODEL: ${EVALUATION_API_MODEL:-Qwen2.5-14B-Instruct}
+      EVALUATION_API_KEY: ${EVALUATION_API_KEY:-}
+      EVALUATION_HARDWARE_LABEL: ${EVALUATION_HARDWARE_LABEL:-not-measured}
+    volumes:
+      - ./data:/data:ro
+      - ./results:/results
+    command: [/opt/xinqing/examples/chat.jsonl, /results/example]

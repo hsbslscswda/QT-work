@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/">
+        <file>prompts/system_prompt.txt</file>
+    </qresource>
+</RCC>

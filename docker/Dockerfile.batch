@@ -1,0 +1,6 @@
+FROM python:3.12-slim-bookworm
+WORKDIR /opt/xinqing
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 EVALUATION_BACKEND=openai_compatible
+COPY backend/a22 ./backend/a22
+COPY examples ./examples
+ENTRYPOINT ["python3", "/opt/xinqing/backend/a22/run_inference.py"]
