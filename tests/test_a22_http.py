@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class A22HttpTest(unittest.TestCase):
     def test_preserved_files(self):
         folder = ROOT / 'backend/a22'
-        manifest = json.loads((folder / 'SHA256SUMS.json').read_text())
+        manifest = json.loads((folder / 'SHA256SUMS.json').read_text(encoding='utf-8'))
         for name, digest in manifest.items():
             self.assertEqual(hashlib.sha256((folder / name).read_bytes()).hexdigest(), digest, name)
 
@@ -61,12 +61,12 @@ class A22HttpTest(unittest.TestCase):
                            NO_PROXY='127.0.0.1,localhost', no_proxy='127.0.0.1,localhost')
                 run = subprocess.run([sys.executable, str(ROOT / 'backend/a22/run_inference.py'),
                                       str(ROOT / 'examples/chat.jsonl'), str(out)],
-                                     env=env, text=True, capture_output=True, timeout=20)
+                                     env=env, encoding='utf-8', errors='replace', capture_output=True, timeout=20)
                 self.assertEqual(run.returncode, 0, run.stderr)
-                pred = json.loads((out / 'submission.jsonl').read_text())
+                pred = json.loads((out / 'submission.jsonl').read_text(encoding='utf-8'))
                 self.assertEqual(pred['emotion_label'], 'joy')
                 self.assertEqual(pred['user_profile']['personality_traits'], [])
-                report = json.loads((out / 'performance_report.json').read_text())
+                report = json.loads((out / 'performance_report.json').read_text(encoding='utf-8'))
                 self.assertFalse(report['complete'])
                 self.assertEqual(report['samples'], 1)
                 self.assertEqual(len(requests), 3)

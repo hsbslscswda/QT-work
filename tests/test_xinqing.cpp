@@ -12,6 +12,7 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QtTest>
 
 class XinqingTest : public QObject {
@@ -60,16 +61,25 @@ private slots:
                 received = QJsonDocument::fromJson(body.left(contentLength)).object();
                 served = true;
                 const QString answer = QStringLiteral("{\"response_text\":\"慢慢来，我在听。\",\"emotion_label\":\"relaxed\",\"user_profile\":{\"personality_traits\":[],\"interests\":[],\"style\":[]},\"memory_refs\":[]}");
-                QByteArray sse;
+                const auto eventFor = [](const QString &content) {
+                    const QJsonObject delta{{"content", content}};
+                    const QJsonObject event{{"choices", QJsonArray{QJsonObject{{"delta", delta}}}}};
+                    return "data: " + QJsonDocument(event).toJson(QJsonDocument::Compact) + "\r\n\r\n";
+                };
+                QByteArray first = eventFor(QStringLiteral("<think>核对上下文</thi"));
+                QByteArray rest = first.right(3) + eventFor(QStringLiteral("nk>"));
+                first.chop(3);
                 for (int i = 0; i < answer.size(); i += 7) {
-                    QJsonObject delta{{"content", answer.mid(i, 7)}};
-                    QJsonObject event{{"choices", QJsonArray{QJsonObject{{"delta", delta}}}}};
-                    sse += "data: " + QJsonDocument(event).toJson(QJsonDocument::Compact) + "\r\n\r\n";
+                    rest += eventFor(answer.mid(i, 7));
                 }
-                sse += "data: [DONE]\r\n\r\n";
-                socket->write("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: " + QByteArray::number(sse.size()) + "\r\nConnection: close\r\n\r\n");
-                socket->write(sse);
-                socket->disconnectFromHost();
+                rest += "data: [DONE]\r\n\r\n";
+                const auto length = QByteArray::number(first.size() + rest.size());
+                socket->write("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: " + length + "\r\nConnection: close\r\n\r\n");
+                socket->write(first);
+                QTimer::singleShot(100, socket, [socket, rest] {
+                    socket->write(rest);
+                    socket->disconnectFromHost();
+                });
             });
             connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
         });
@@ -100,7 +110,13 @@ private slots:
         QFile saved(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/xinqing_sessions.json");
         QVERIFY(saved.open(QIODevice::ReadOnly));
         const QByteArray savedBytes = saved.readAll();
-        QVERIFY(savedBytes.contains(QStringLiteral("慢慢来，我在听。").toUtf8()));
+        const auto sessions = QJsonDocument::fromJson(savedBytes).object().value("sessions").toArray();
+        QVERIFY(!sessions.isEmpty());
+        const auto messages = sessions.first().toObject().value("messages").toArray();
+        QVERIFY(!messages.isEmpty());
+        const auto answer = messages.last().toObject();
+        QCOMPARE(answer.value("text").toString(), QStringLiteral("慢慢来，我在听。"));
+        QCOMPARE(answer.value("thinking").toString(), QStringLiteral("核对上下文"));
         QVERIFY(!savedBytes.contains("fixture-key"));
         qunsetenv("XINQING_API_BASE"); qunsetenv("XINQING_MODEL"); qunsetenv("XINQING_API_KEY");
     }
