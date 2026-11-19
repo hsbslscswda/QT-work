@@ -10,6 +10,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QSaveFile>
 #include <QFontMetrics>
 #include <QFrame>
 #include <QGridLayout>
@@ -654,7 +655,7 @@ void MainWindow::switchSession(int index)
 
 void MainWindow::deleteSession(int index)
 {
-    if (index < 0 || index >= m_sessions.size())
+    if (m_chatReply || index < 0 || index >= m_sessions.size())
         return;
 
     if (m_sessions.size() == 1) {
@@ -663,6 +664,7 @@ void MainWindow::deleteSession(int index)
         m_sessions[0].lastEmotion = "neutral";
         refreshSessionListWidget();
         switchSession(0);
+        saveSessionsToFile();
         return;
     }
 
@@ -687,11 +689,15 @@ void MainWindow::refreshSessionListWidget()
 
 void MainWindow::onNewChatClicked()
 {
-    // 如果上一轮会话因连接异常或超时未结束，开启新会话时主动安全释放，绝不锁死输入框
     if (m_chatReply) {
-        m_chatReply->abort();
-        m_chatReply->deleteLater();
+        auto *reply = m_chatReply;
         m_chatReply = nullptr;
+        disconnect(reply, nullptr, this, nullptr);
+        reply->abort();
+        reply->deleteLater();
+        auto &messages = m_sessions[m_currentSessionIdx].messages;
+        if (!messages.isEmpty() && messages.last().role == "user")
+            messages.removeLast();
     }
     if (m_uiThrottleTimer) m_uiThrottleTimer->stop();
 
@@ -719,6 +725,10 @@ void MainWindow::onSessionItemClicked(QListWidgetItem *item)
 
 void MainWindow::onSessionContextMenu(const QPoint &pos)
 {
+    if (m_chatReply) {
+        statusBar()->showMessage("回复期间暂不能删除会话", 5000);
+        return;
+    }
     auto *item = m_sessionList->itemAt(pos);
     if (!item) return;
     int row = m_sessionList->row(item);
@@ -838,10 +848,10 @@ void MainWindow::saveSessionsToFile()
     QJsonObject root;
     root["sessions"] = sArr;
 
-    QFile f(sessionsFilePath());
-    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        f.write(QJsonDocument(root).toJson(QJsonDocument::Compact));
-    }
+    const auto data = QJsonDocument(root).toJson(QJsonDocument::Compact);
+    QSaveFile file(sessionsFilePath());
+    if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit())
+        statusBar()->showMessage(QString("会话记录保存失败：%1").arg(file.errorString()), 8000);
 }
 
 void MainWindow::loadSessionsFromFile()

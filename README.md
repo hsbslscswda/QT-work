@@ -1,18 +1,14 @@
 # 心晴
 
-《高级语言编程实训2》课程大作业。使用 C++17 和 Qt Widgets 开发的情绪陪伴桌面程序，当前界面版本为 v5.1 Silent Horizon。
-
-心晴提供多会话聊天、流式回复、会话保存、随情绪变化的背景和伴读浮窗。模型通过网络接口提供回复，界面程序可以独立编译、启动和展示。
+心晴是我们《高级语言编程实训2》的课程项目。用 C++17 和 Qt Widgets 做了一个桌面聊天窗口，支持流式回复、多会话、本地记录和伴读浮窗。回复里的情绪标签会改变窗口顶栏的颜色。
 
 ## 下载与运行
 
-Windows 免安装包由 GitHub Actions 自动构建并发布。可通过以下入口下载；若尚无发布文件，可在仓库的 Actions 页面查看构建进度。
-
 [下载 Windows 64 位免安装版](https://github.com/hsbslscswda/QT-work/releases/latest/download/Xinqing-Windows-x64.zip) · [查看发布记录](https://github.com/hsbslscswda/QT-work/releases)
 
-下载后先解压整个文件夹，再双击 `Xinqing.exe`。发布包包含 Qt 运行依赖，无需安装 Qt Creator。若系统提示缺少 `MSVCP140.dll` 或 `VCRUNTIME140.dll`，先运行包内的 `vc_redist.x64.exe` 安装微软 C++ 运行库，再启动心晴。首次使用时，打开侧边栏底部的“服务连接配置”，填写地址、模型名和自己的 API Key，保存后发送一条消息。
-
-**使用 API 不需要下载权重，也不需要本机有独立显卡。API 服务及其调用费用由使用者自行准备。** 仅打开和浏览界面不需要 API。
+1. 解压整个 ZIP，再双击 `Xinqing.exe`。如果系统提示缺少 `MSVCP140.dll` 或 `VCRUNTIME140.dll`，先运行包内的 `vc_redist.x64.exe`。
+2. 只看界面可以直接打开。要试聊，在左下角打开「服务连接配置」，填写地址、模型名和 API Key，保存后发一条消息。
+3. 用远程 API 时，本机无需下载模型权重或准备独立显卡。服务账号与调用费用由使用者自行准备。
 
 ## 连接模型
 
@@ -35,7 +31,7 @@ cmake --build build --config Release --parallel
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-Windows 可执行文件在 `build/app/Release/Xinqing.exe`，Linux 通常在 `build/app/Xinqing`。发布打包命令见 [构建与发布](docs/build.md)。
+Windows 下用 Ninja 构建时，程序在 `build/app/Xinqing.exe`；用 Visual Studio 生成器时，在 `build/app/Release/Xinqing.exe`。Linux 下通常是 `build/app/Xinqing`。只编译客户端可在配置时加 `-DBUILD_TESTING=OFF`。完整流程见 [构建与发布](docs/build.md)。
 
 ## 本地模型与 Docker
 
@@ -63,8 +59,8 @@ docker compose logs -f model
 
 ## 课程展示
 
-建议演示：新建会话 → 发送消息并观察流式输出 → 切换与恢复会话 → 打开伴读浮窗 → 查看重启后的会话保存。实现说明见 [课程项目说明](docs/course-project.md)。
+课堂演示可以从新建会话开始：发一条消息，看回复逐段出现，再切换会话、试一下伴读浮窗。关闭后重新打开，可以检查聊天记录是否恢复。源码入口和实现说明见 [课程项目说明](docs/course-project.md)，已做过的检查见 [验证记录](docs/validation.md)。
 
-本地聊天记录与服务设置保存在系统的应用数据目录。界面保存的 API Key 是本机配置文件中的明文，请勿把该目录或真实密钥上传到仓库。也可通过 `XINQING_API_BASE`、`XINQING_MODEL`、`XINQING_API_KEY` 临时设置连接，避免在共享机器上点击保存密钥。
+聊天记录和服务设置保存在本机应用数据目录。每次发送消息时，程序会把当前会话的历史发给你配置的模型服务。通过界面保存的 API Key 会以明文写入本机配置文件。在共享电脑上演示时，可以用 `XINQING_API_BASE`、`XINQING_MODEL`、`XINQING_API_KEY` 临时启动程序。
 
 Qt 和其他依赖保留各自许可，详见 [第三方说明](THIRD_PARTY_NOTICES.md)。
